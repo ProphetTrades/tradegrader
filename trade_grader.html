@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade Grader — Confluence Calculator</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #11161d;
+      --text: #e6edf3;
+      --muted: #9fb3c8;
+      --accent: #9ad1ff; /* baby blue accent */
+      --accent-strong: #67c1ff;
+      --good: #23d18b;
+      --warn: #ffd166;
+      --bad: #ff6b6b;
+      --shadow: 0 10px 30px rgba(0,0,0,0.4);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    a { color: var(--accent); }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 18px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+    header h1 { font-size: 20px; margin: 0; color: var(--text); letter-spacing: 0.3px; }
+    .pill { padding: 6px 10px; border: 1px solid #1b2633; border-radius: 999px; color: var(--muted); background: #0b131c; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    @media (min-width: 900px) {
+      .grid { grid-template-columns: 1.1fr 0.9fr; }
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(18,24,32,0.92), rgba(12,16,22,0.92));
+      border: 1px solid #1b2633;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+    .card h2 { margin: 0 0 8px 0; font-size: 16px; color: var(--accent); }
+    .hint { color: var(--muted); font-size: 13px; }
+    .section { margin-top: 12px; }
+    .section h3 { margin: 0 0 8px 0; font-size: 15px; color: var(--accent-strong); }
+    .factor {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-radius: 10px;
+      border: 1px solid #1b2633; background: #0f1620; margin-bottom: 8px;
+    }
+    .factor label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .factor small { color: var(--muted); }
+    input[type="checkbox"] {
+      width: 20px; height: 20px; accent-color: var(--accent);
+    }
+    .summary {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+    .kpi {
+      background: #0f1620; border: 1px solid #1b2633; border-radius: 12px; padding: 12px;
+      text-align: center;
+    }
+    .kpi h4 { margin: 0; font-size: 13px; color: var(--muted); }
+    .kpi .val { font-size: 20px; margin-top: 6px; }
+    .scoreBadge {
+      display: grid; place-items: center; text-align: center;
+      border-radius: 16px;
+      padding: 18px;
+      background: radial-gradient(120% 120% at 50% 0%, rgba(154,209,255,0.18) 0%, rgba(26,39,53,0.6) 60%, rgba(15,22,32,0.9) 100%);
+      border: 1px solid #1b2633;
+    }
+    .scoreBadge .score { font-size: 40px; font-weight: 700; letter-spacing: 0.5px; }
+    .scoreBadge .grade { margin-top: 6px; font-size: 16px; font-weight: 600; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px;
+      border-radius: 999px; border: 1px solid #1b2633; background: #0b131c; color: var(--muted);
+      font-size: 12px;
+    }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .row input, .row select, .row textarea, .row button {
+      width: 100%;
+    }
+    input, select, textarea {
+      background: #0f1620; border: 1px solid #1b2633; border-radius: 10px; color: var(--text);
+      padding: 10px 12px; font-size: 14px; outline: none;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    button {
+      border: 1px solid #1b2633; background: linear-gradient(180deg, #132131, #0f1620);
+      color: var(--text); border-radius: 12px; padding: 10px 14px; font-weight: 600; cursor: pointer;
+    }
+    button:hover { filter: brightness(1.08); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 10px; border-bottom: 1px solid #1b2633; text-align: left; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .tag { padding: 3px 8px; border-radius: 999px; font-size: 12px; border: 1px solid #1b2633; }
+    .tag.weekly { color: #9ad1ff; }
+    .tag.daily { color: #a1ffd4; }
+    .tag.h4 { color: #ffe7a1; }
+    .tag.extra { color: #ffb6c1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Confluence Summary — Trade Grader</h1>
+      <div class="pill">Max Score: <strong id="maxScore">180%</strong></div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Select Confluences</h2>
+        <div class="hint">Tap the factors present in your setup. Scores update in real time.</div>
+
+        <!-- Weekly -->
+        <div class="section">
+          <h3>Weekly</h3>
+          <div class="factor"><label><input type="checkbox" data-pct="5" data-cat="weekly"> Weekly touching EMA <small>(5%)</small></label><span class="tag weekly">W</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="weekly"> Weekly candlestick rejection <small>(10%)</small></label><span class="tag weekly">W</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="weekly"> Weekly rejection from previous structure <small>(10%)</small></label><span class="tag weekly">W</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="weekly"> Weekly pattern <small>(10%)</small></label><span class="tag weekly">W</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="weekly"> Weekly in favor <small>(10%)</small></label><span class="tag weekly">W</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="weekly"> Weekly at / rejected AOI <small>(10%)</small></label><span class="tag weekly">W</span></div>
+        </div>
+
+        <!-- Daily -->
+        <div class="section">
+          <h3>Daily</h3>
+          <div class="factor"><label><input type="checkbox" data-pct="5" data-cat="daily"> Daily touching EMA <small>(5%)</small></label><span class="tag daily">D</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="daily"> Daily candlestick rejection <small>(10%)</small></label><span class="tag daily">D</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="daily"> Daily rejection from previous structure <small>(10%)</small></label><span class="tag daily">D</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="daily"> Daily pattern <small>(10%)</small></label><span class="tag daily">D</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="daily"> Daily in favor <small>(10%)</small></label><span class="tag daily">D</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="daily"> Daily at / rejected AOI <small>(10%)</small></label><span class="tag daily">D</span></div>
+        </div>
+
+        <!-- 4H -->
+        <div class="section">
+          <h3>4H</h3>
+          <div class="factor"><label><input type="checkbox" data-pct="5" data-cat="h4"> 4H touching EMA / EMA in favor <small>(5%)</small></label><span class="tag h4">4H</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="h4"> 4H candlestick rejection <small>(10%)</small></label><span class="tag h4">4H</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="h4"> 4H rejection from previous structure <small>(10%)</small></label><span class="tag h4">4H</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="h4"> 4H pattern <small>(10%)</small></label><span class="tag h4">4H</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="h4"> 4H in favor <small>(10%)</small></label><span class="tag h4">4H</span></div>
+        </div>
+
+        <!-- Extras -->
+        <div class="section">
+          <h3>Extras</h3>
+          <div class="factor"><label><input type="checkbox" data-pct="5" data-cat="extra"> Round psychological level <small>(5%)</small></label><span class="tag extra">EX</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="extra"> Shift of structure (SOS) <small>(10%)</small></label><span class="tag extra">EX</span></div>
+          <div class="factor"><label><input type="checkbox" data-pct="10" data-cat="extra"> Engulfing pattern <small>(10%)</small></label><span class="tag extra">EX</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="summary" style="margin-bottom:12px;">
+          <div class="kpi">
+            <h4>Weekly</h4>
+            <div class="val" id="weeklySum">0%</div>
+          </div>
+          <div class="kpi">
+            <h4>Daily</h4>
+            <div class="val" id="dailySum">0%</div>
+          </div>
+          <div class="kpi">
+            <h4>4H</h4>
+            <div class="val" id="h4Sum">0%</div>
+          </div>
+          <div class="kpi">
+            <h4>Extras</h4>
+            <div class="val" id="extraSum">0%</div>
+          </div>
+        </div>
+
+        <div class="scoreBadge">
+          <div class="badge">Confluence Score</div>
+          <div class="score" id="totalScore">0%</div>
+          <div class="grade" id="gradeText">Grade: D</div>
+        </div>
+
+        <div class="section" style="margin-top:14px;">
+          <h3>Save Trade</h3>
+          <div class="row" style="gap: 10px;">
+            <input id="pair" placeholder="Pair (e.g., GBP/NZD)" />
+            <select id="direction">
+              <option value="Buy">Buy</option>
+              <option value="Sell">Sell</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <textarea id="notes" placeholder="Notes (setup, entry, confirmations...)"></textarea>
+          </div>
+          <div class="actions" style="margin-top:10px;">
+            <button id="saveBtn">Save to Journal</button>
+            <button id="resetBtn">Reset Selection</button>
+            <button id="exportBtn">Export CSV</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <h2>Journal</h2>
+      <div class="hint">Saved trades are stored on this device (local). You can export CSV anytime.</div>
+      <div style="overflow-x:auto;">
+        <table id="journalTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Pair</th>
+              <th>Side</th>
+              <th>Score</th>
+              <th>Grade</th>
+              <th>Breakdown</th>
+              <th>Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer style="margin: 18px 0; color: var(--muted); font-size: 12px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <div>Max score is derived from selected confluences (total = 180%).</div>
+      <div>Grading: A+ = 90–180, B+ = 80–89, C+ = 70–79, D = 69 or less.</div>
+    </footer>
+  </div>
+
+  <script>
+    const gradeFromScore = (s) => {
+      if (s >= 90) return {label: "A+ TRADE", color: getComputedStyle(document.documentElement).getPropertyValue('--good').trim()};
+      if (s >= 80) return {label: "B+ TRADE", color: getComputedStyle(document.documentElement).getPropertyValue('--warn').trim()};
+      if (s >= 70) return {label: "C TRADE", color: getComputedStyle(document.documentElement).getPropertyValue('--warn').trim()};
+      return {label: "D TRADE", color: getComputedStyle(document.documentElement).getPropertyValue('--bad').trim()};
+    };
+
+    const checkboxes = Array.from(document.querySelectorAll('input[type="checkbox"][data-pct]'));
+    const els = {
+      weeklySum: document.getElementById('weeklySum'),
+      dailySum: document.getElementById('dailySum'),
+      h4Sum: document.getElementById('h4Sum'),
+      extraSum: document.getElementById('extraSum'),
+      totalScore: document.getElementById('totalScore'),
+      gradeText: document.getElementById('gradeText'),
+      pair: document.getElementById('pair'),
+      direction: document.getElementById('direction'),
+      notes: document.getElementById('notes'),
+      saveBtn: document.getElementById('saveBtn'),
+      resetBtn: document.getElementById('resetBtn'),
+      exportBtn: document.getElementById('exportBtn'),
+      journalTableBody: document.querySelector('#journalTable tbody'),
+      maxScore: document.getElementById('maxScore')
+    };
+
+    const MAX_SCORE = 180; // Derived from list
+
+    function calc() {
+      let totals = { weekly: 0, daily: 0, h4: 0, extra: 0 };
+      checkboxes.forEach(cb => {
+        if (cb.checked) {
+          const pct = Number(cb.dataset.pct || 0);
+          const cat = cb.dataset.cat;
+          if (totals[cat] !== undefined) totals[cat] += pct;
+        }
+      });
+      const total = totals.weekly + totals.daily + totals.h4 + totals.extra;
+
+      els.weeklySum.textContent = totals.weekly + "%";
+      els.dailySum.textContent = totals.daily + "%";
+      els.h4Sum.textContent = totals.h4 + "%";
+      els.extraSum.textContent = totals.extra + "%";
+
+      els.totalScore.textContent = total + "%";
+      const g = gradeFromScore(total);
+      els.gradeText.textContent = "Grade: " + g.label;
+      els.gradeText.style.color = g.color;
+      els.totalScore.style.color = g.color;
+    }
+
+    checkboxes.forEach(cb => cb.addEventListener('change', calc));
+
+    function resetSelection() {
+      checkboxes.forEach(cb => cb.checked = false);
+      calc();
+    }
+
+    function loadJournal() {
+      const data = JSON.parse(localStorage.getItem('trade_journal') || '[]');
+      renderJournal(data);
+    }
+
+    function saveToJournal(entry) {
+      const data = JSON.parse(localStorage.getItem('trade_journal') || '[]');
+      data.unshift(entry);
+      localStorage.setItem('trade_journal', JSON.stringify(data));
+      renderJournal(data);
+    }
+
+    function deleteEntry(idx) {
+      const data = JSON.parse(localStorage.getItem('trade_journal') || '[]');
+      data.splice(idx, 1);
+      localStorage.setItem('trade_journal', JSON.stringify(data));
+      renderJournal(data);
+    }
+
+    function renderJournal(data) {
+      els.journalTableBody.innerHTML = "";
+      data.forEach((e, idx) => {
+        const tr = document.createElement('tr');
+        const breakdown = `W:${e.weekly}% / D:${e.daily}% / 4H:${e.h4}% / Ex:${e.extra}%`;
+        tr.innerHTML = `
+          <td>${e.date}</td>
+          <td>${e.pair}</td>
+          <td>${e.direction}</td>
+          <td>${e.total}%</td>
+          <td>${e.grade}</td>
+          <td>${breakdown}</td>
+          <td>${e.notes ? e.notes.replace(/</g,"&lt;") : ""}</td>
+          <td><button data-del="${idx}">Delete</button></td>
+        `;
+        els.journalTableBody.appendChild(tr);
+      });
+      // bind deletes
+      Array.from(document.querySelectorAll('button[data-del]')).forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = Number(btn.getAttribute('data-del'));
+          deleteEntry(i);
+        });
+      });
+    }
+
+    function exportCSV() {
+      const data = JSON.parse(localStorage.getItem('trade_journal') || '[]');
+      if (!data.length) { alert("No entries to export."); return; }
+      const headers = ["Date","Pair","Direction","Total","Grade","Weekly","Daily","4H","Extras","Notes"];
+      const rows = data.map(e => [e.date, e.pair, e.direction, e.total, e.grade, e.weekly, e.daily, e.h4, e.extra, JSON.stringify(e.notes||"")]);
+      const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "trade_journal.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    els.saveBtn.addEventListener('click', () => {
+      // compute current
+      let totals = { weekly: 0, daily: 0, h4: 0, extra: 0 };
+      checkboxes.forEach(cb => {
+        if (cb.checked) {
+          const pct = Number(cb.dataset.pct || 0);
+          const cat = cb.dataset.cat;
+          if (totals[cat] !== undefined) totals[cat] += pct;
+        }
+      });
+      const total = totals.weekly + totals.daily + totals.h4 + totals.extra;
+      const g = gradeFromScore(total);
+      const entry = {
+        date: new Date().toLocaleString(),
+        pair: els.pair.value || "",
+        direction: els.direction.value || "",
+        notes: els.notes.value || "",
+        total,
+        grade: g.label,
+        weekly: totals.weekly,
+        daily: totals.daily,
+        h4: totals.h4,
+        extra: totals.extra
+      };
+      saveToJournal(entry);
+      els.pair.value = ""; els.notes.value = "";
+    });
+
+    els.resetBtn.addEventListener('click', resetSelection);
+    els.exportBtn.addEventListener('click', exportCSV);
+
+    // init
+    els.maxScore.textContent = MAX_SCORE + "%";
+    calc();
+    loadJournal();
+  </script>
+</body>
+</html>
